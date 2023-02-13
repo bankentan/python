@@ -1,15 +1,11 @@
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
-  name: deny-egress
-  namespace: test
+  name: foo-deny-egress
 spec:
   podSelector:
     matchLabels:
-      app: kentan
+      app: foo
   policyTypes:
   - Egress
-  egress:
-  - to:
-    - ipBlock:
-        cidr: 0.0.0.0/0
+  egress: []
