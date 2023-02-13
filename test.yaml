@@ -1,15 +1,15 @@
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
-  name: deny-external-access
-  namespace: ken-y-j-tansp
+  name: deny-egress
+  namespace: test
 spec:
-  podSelector: {}
+  podSelector:
+    matchLabels:
+      app: kentan
   policyTypes:
-  - Ingress
-  ingress:
-  - from:
+  - Egress
+  egress:
+  - to:
     - ipBlock:
-        cidr: 128.161.251.11/32
-    - ipBlock:
-        cidr: 192.168.216.10/32        
+        cidr: 0.0.0.0/0
