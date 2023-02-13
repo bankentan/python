@@ -1,29 +1,15 @@
-apiVersion: security.istio.io/v1beta1
-kind: EgressRule
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
 metadata:
-  name: deny-all-egress
-  namespace: test
+  name: deny-external-access
+  namespace: ken-y-j-tansp
 spec:
-  destination:
-    notHosts:
-    - "*"
-  toPorts:
-  - port: 0
-    protocol: TCP
-    
-----
-apiVersion: networking.istio.io/v1
-kind: DestinationRule
-metadata:
-  name: deny-egress-for-pod
-  namespace: test
-spec:
-  host: "*"
-  trafficPolicy:
-    egress:
-    - rule:
-      - from:
-        - source:
-            selector: app: kentan
-      to:
-        - operation: DENY
+  podSelector: {}
+  policyTypes:
+  - Ingress
+  ingress:
+  - from:
+    - ipBlock:
+        cidr: 128.161.251.11/32
+    - ipBlock:
+        cidr: 192.168.216.10/32        
