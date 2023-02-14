@@ -1,31 +1,30 @@
-apiVersion: networking.istio.io/v1alpha3
-kind: ServiceEntry
-metadata:
-  name: egress-squid
-spec:
-  hosts:
-  - squid.egress.svc.cluster.local
-  ports:
-  - name: http
-    number: 3128
-    protocol: TCP
-  resolution: DNS
-  location: MESH_EXTERNAL
----
-apiVersion: networking.istio.io/v1alpha3
-kind: VirtualService
-metadata:
-  name: egress-squid
-spec:
-  hosts:
-  - squid.egress.svc.cluster.local
-  tls:
-  - match:
-    - port: 443
-      sni_hosts:
-      - squid.egress.svc.cluster.local
-    route:
-    - destination:
-        host: squid.egress.svc.cluster.local
-        port:
-          name: http
+func handlePodMutate(request *v1beta1.AdmissionRequest) (*v1beta1.AdmissionResponse, error) {
+  pod := &corev1.Pod{}
+  if err := json.Unmarshal(request.Object.Raw, pod); err != nil {
+    return nil, err
+  }
+
+  // Check if the pod has the "app=example" label.
+  if pod.Labels["app"] != "example" {
+    return &v1beta1.AdmissionResponse{
+      Allowed: true,
+    }, nil
+  }
+
+  // Add a sidecar container to the pod.
+  pod.Spec.Containers = append(pod.Spec.Containers, corev1.Container{
+    Name:  "example-sidecar",
+    Image: "example.com/sidecar:latest",
+  })
+
+  patchBytes, err := json.Marshal(pod)
+  if err != nil {
+    return nil, err
+  }
+
+  return &v1beta1.AdmissionResponse{
+    Allowed:   true,
+    Patch:     patchBytes,
+    PatchType: &patchType,
+  }, nil
+}
