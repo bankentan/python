@@ -1,11 +1,31 @@
-apiVersion: networking.k8s.io/v1
-kind: NetworkPolicy
+apiVersion: networking.istio.io/v1alpha3
+kind: ServiceEntry
 metadata:
-  name: foo-deny-egress
+  name: egress-squid
 spec:
-  podSelector:
-    matchLabels:
-      app: foo
-  policyTypes:
-  - Egress
-  egress: []
+  hosts:
+  - squid.egress.svc.cluster.local
+  ports:
+  - name: http
+    number: 3128
+    protocol: TCP
+  resolution: DNS
+  location: MESH_EXTERNAL
+---
+apiVersion: networking.istio.io/v1alpha3
+kind: VirtualService
+metadata:
+  name: egress-squid
+spec:
+  hosts:
+  - squid.egress.svc.cluster.local
+  tls:
+  - match:
+    - port: 443
+      sni_hosts:
+      - squid.egress.svc.cluster.local
+    route:
+    - destination:
+        host: squid.egress.svc.cluster.local
+        port:
+          name: http
