@@ -4,17 +4,17 @@ func handlePodMutate(request *v1beta1.AdmissionRequest) (*v1beta1.AdmissionRespo
     return nil, err
   }
 
-  // Check if the pod has the "app=example" label.
-  if pod.Labels["app"] != "example" {
+  // Check if the pod has the "app=ken" label.
+  if pod.Labels["app"] != "ken" {
     return &v1beta1.AdmissionResponse{
       Allowed: true,
     }, nil
   }
 
-  // Add a sidecar container to the pod.
-  pod.Spec.Containers = append(pod.Spec.Containers, corev1.Container{
-    Name:  "example-sidecar",
-    Image: "example.com/sidecar:latest",
+  // Add HTTPS_PROXY environment variable to the pod.
+  pod.Spec.Containers[0].Env = append(pod.Spec.Containers[0].Env, corev1.EnvVar{
+    Name:  "HTTPS_PROXY",
+    Value: "https://proxy.example.com",
   })
 
   patchBytes, err := json.Marshal(pod)
