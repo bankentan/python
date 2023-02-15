@@ -1,16 +1,15 @@
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
-  name: allow-outbound-traffic
+  name: allow-egress-443
 spec:
-  podSelector:
-    matchLabels:
-      app: my-app
+  podSelector: {}
+  policyTypes:
+  - Egress
   egress:
   - to:
-    - namespaceSelector:
-        matchLabels:
-          environment: prod
+    - ipBlock:
+        cidr: 0.0.0.0/0
     ports:
     - protocol: TCP
-      port: 80
+      port: 443
