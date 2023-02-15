@@ -1,15 +1,19 @@
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
-  name: allow-egress-443
+  name: allow-egress-to-default-namespace
+  namespace: ken
 spec:
-  podSelector: {}
+  podSelector:
+    matchLabels:
+      app: myapp
   policyTypes:
   - Egress
   egress:
   - to:
-    - ipBlock:
-        cidr: 0.0.0.0/0
+    - namespaceSelector:
+        matchLabels:
+          name: default
     ports:
     - protocol: TCP
       port: 443
