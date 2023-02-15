@@ -1,51 +1,16 @@
-func handlePodMutate(request *v1beta1.AdmissionRequest) (*v1beta1.AdmissionResponse, error) {
-  pod := &corev1.Pod{}
-  if err := json.Unmarshal(request.Object.Raw, pod); err != nil {
-    return nil, err
-  }
-
-  // Check if the pod has the "app=ken" label.
-  if pod.Labels["app"] != "ken" {
-    return &v1beta1.AdmissionResponse{
-      Allowed: true,
-    }, nil
-  }
-
-  // Add HTTPS_PROXY environment variable to the pod.
-  pod.Spec.Containers[0].Env = append(pod.Spec.Containers[0].Env, corev1.EnvVar{
-    Name:  "HTTPS_PROXY",
-    Value: "https://proxy.example.com",
-  })
-
-  patchBytes, err := json.Marshal(pod)
-  if err != nil {
-    return nil, err
-  }
-
-  return &v1beta1.AdmissionResponse{
-    Allowed:   true,
-    Patch:     patchBytes,
-    PatchType: &patchType,
-  }, nil
-}
-
---------
-apiVersion: admissionregistration.k8s.io/v1
-kind: MutatingWebhookConfiguration
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
 metadata:
-  name: add-https-proxy-webhook
-webhooks:
-  - name: add-https-proxy
-    clientConfig:
-      service:
-        name: add-https-proxy-svc
-        namespace: default
-        path: /mutate
-      caBundle: base64-encoded-ca-bundle
-    rules:
-      - apiGroups: [""]
-        apiVersions: ["v1"]
-        operations: ["CREATE"]
-        resources: ["pods"]
-    sideEffects: None
-    timeoutSeconds: 5
+  name: allow-outbound-traffic
+spec:
+  podSelector:
+    matchLabels:
+      app: my-app
+  egress:
+  - to:
+    - namespaceSelector:
+        matchLabels:
+          environment: prod
+    ports:
+    - protocol: TCP
+      port: 80
