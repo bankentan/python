@@ -1,19 +1,21 @@
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
-  name: allow-egress-to-default-namespace
-  namespace: ken
+  name: default-deny-all-egress
 spec:
-  podSelector:
-    matchLabels:
-      app: myapp
-  policyTypes:
-  - Egress
+  podSelector: {}
   egress:
   - to:
     - namespaceSelector:
         matchLabels:
-          name: default
+          networking/namespace: kube-system
+      podSelector:
+        matchLabels:
+          k8s-app: kube-dns
     ports:
     - protocol: TCP
-      port: 443
+      port: 53
+    - protocol: UDP
+      port: 53
+  policyTypes:
+  - Egress
