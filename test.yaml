@@ -1,105 +1,72 @@
 package main
 
 import (
-	"encoding/json"
-	"fmt"
-	"io/ioutil"
-	"net/http"
-	"strings"
-
-	"k8s.io/api/admission/v1beta1"
-	metaV1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+    "encoding/json"
+    "fmt"
+    "io/ioutil"
+    "net/http"
+    "os"
+    "strconv"
 )
 
-type PodPatch struct {
-	Op    string            `json:"op"`
-	Path  string            `json:"path"`
-	Value interface{}       `json:"value,omitempty"`
+const (
+    certFile = "/var/run/secrets/kubernetes.io/serviceaccount/ca.crt"
+    port     = 443
+)
+
+type Pod struct {
+    Metadata struct {
+        Name      string `json:"name"`
+        Namespace string `json:"namespace"`
+    } `json:"metadata"`
+    Spec struct {
+        Containers []struct {
+            Name  string            `json:"name"`
+            Env   []map[string]Env `json:"env"`
+        } `json:"containers"`
+    } `json:"spec"`
+}
+
+type Env struct {
+    Name  string `json:"name"`
+    Value string `json:"value"`
 }
 
 func main() {
-	http.HandleFunc("/mutate", handleMutate)
-	http.ListenAndServeTLS(":443", "tls.crt", "tls.key", nil)
+    http.HandleFunc("/mutate", handleMutate)
+    err := http.ListenAndServeTLS(":"+strconv.Itoa(port), certFile, certFile, nil)
+    if err != nil {
+        fmt.Println(err)
+        os.Exit(1)
+    }
 }
 
 func handleMutate(w http.ResponseWriter, r *http.Request) {
-	admissionReview := v1beta1.AdmissionReview{}
-	if err := json.NewDecoder(r.Body).Decode(&admissionReview); err != nil {
-		http.Error(w, fmt.Sprintf("could not decode admission review: %v", err), http.StatusBadRequest)
-		return
-	}
+    body, err := ioutil.ReadAll(r.Body)
+    if err != nil {
+        http.Error(w, "Error reading request body", http.StatusBadRequest)
+        return
+    }
 
-	podResource := metaV1.GroupVersionResource{Group: "", Version: "v1", Resource: "pods"}
+    var pod Pod
+    if err := json.Unmarshal(body, &pod); err != nil {
+        http.Error(w, "Error parsing request body", http.StatusBadRequest)
+        return
+    }
 
-	if admissionReview.Request.Resource != podResource {
-		http.Error(w, fmt.Sprintf("expect resource to be %s", podResource), http.StatusBadRequest)
-		return
-	}
+    for i, container := range pod.Spec.Containers {
+        envVar := make(map[string]Env)
+        envVar["HTTPS_PROXY"] = Env{"HTTPS_PROXY", "egress"}
+        pod.Spec.Containers[i].Env = append(container.Env, envVar)
+    }
 
-	raw := admissionReview.Request.Object.Raw
-	pod := coreV1.Pod{}
-	if err := json.Unmarshal(raw, &pod); err != nil {
-		http.Error(w, fmt.Sprintf("could not unmarshal raw object: %v", err), http.StatusBadRequest)
-		return
-	}
+    patchedPod, err := json.Marshal(pod)
+    if err != nil {
+        http.Error(w, "Error generating response body", http.StatusInternalServerError)
+        return
+    }
 
-	var patches []PodPatch
-
-	if !hasHTTPSProxyEgress(pod.Spec.Containers) {
-		patches = append(patches, addEnvPatch())
-	}
-
-	if len(patches) == 0 {
-		writeResponse(w, admissionReview.Response)
-		return
-	}
-
-	patchBytes, err := json.Marshal(patches)
-	if err != nil {
-		http.Error(w, fmt.Sprintf("could not marshal patch: %v", err), http.StatusInternalServerError)
-		return
-	}
-
-	admissionReview.Response.Allowed = true
-	admissionReview.Response.Patch = patchBytes
-	pt := v1beta1.PatchTypeJSONPatch
-	admissionReview.Response.PatchType = &pt
-	writeResponse(w, admissionReview.Response)
-}
-
-func hasHTTPSProxyEgress(containers []coreV1.Container) bool {
-	for _, container := range containers {
-		for _, env := range container.Env {
-			if env.Name == "HTTPS_PROXY" && env.Value == "egress" {
-				return true
-			}
-		}
-	}
-	return false
-}
-
-func addEnvPatch() PodPatch {
-	return PodPatch{
-		Op:   "add",
-		Path: "/spec/containers/0/env/-",
-		Value: coreV1.EnvVar{
-			Name:  "HTTPS_PROXY",
-			Value: "egress",
-		},
-	}
-}
-
-func writeResponse(w http.ResponseWriter, response *v1beta1.AdmissionResponse) {
-	admissionReview := v1beta1.AdmissionReview{
-		Response: response,
-	}
-	respBytes, err := json.Marshal(admissionReview)
-	if err != nil {
-		http.Error(w, fmt.Sprintf("could not marshal response: %v", err), http.StatusInternalServerError)
-		return
-	}
-	w.Header().Set("Content-Type", "application/json")
-	if _, err := w.Write(respBytes); err != nil {
-		http.Error(w, fmt.Sprintf("could not write response: %v", err), http.StatusInternalServerError)
-	}
+    w.Header().Set("Content-Type", "application/json")
+    w.WriteHeader(http.StatusOK)
+    w.Write(patchedPod)
 }
