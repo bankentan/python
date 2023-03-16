@@ -2,71 +2,81 @@ package main
 
 import (
     "encoding/json"
-    "fmt"
-    "io/ioutil"
+    "log"
     "net/http"
-    "os"
-    "strconv"
+
+    "github.com/gorilla/mux"
+    admissionv1 "k8s.io/api/admission/v1"
+    metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
-
-const (
-    certFile = "/var/run/secrets/kubernetes.io/serviceaccount/ca.crt"
-    port     = 443
-)
-
-type Pod struct {
-    Metadata struct {
-        Name      string `json:"name"`
-        Namespace string `json:"namespace"`
-    } `json:"metadata"`
-    Spec struct {
-        Containers []struct {
-            Name  string            `json:"name"`
-            Env   []map[string]Env `json:"env"`
-        } `json:"containers"`
-    } `json:"spec"`
-}
-
-type Env struct {
-    Name  string `json:"name"`
-    Value string `json:"value"`
-}
 
 func main() {
-    http.HandleFunc("/mutate", handleMutate)
-    err := http.ListenAndServeTLS(":"+strconv.Itoa(port), certFile, certFile, nil)
-    if err != nil {
-        fmt.Println(err)
-        os.Exit(1)
-    }
+    router := mux.NewRouter()
+    router.HandleFunc("/mutate", handleMutate).Methods("POST")
+    log.Fatal(http.ListenAndServeTLS(":8443", "server.crt", "server.key", router))
 }
 
 func handleMutate(w http.ResponseWriter, r *http.Request) {
-    body, err := ioutil.ReadAll(r.Body)
+    var admissionReviewReq admissionv1.AdmissionReview
+    if err := json.NewDecoder(r.Body).Decode(&admissionReviewReq); err != nil {
+        http.Error(w, "could not decode request", http.StatusBadRequest)
+        return
+    }
+    pod := &corev1.Pod{}
+    rawPod := admissionReviewReq.Request.Object.Raw
+    if err := json.Unmarshal(rawPod, pod); err != nil {
+        http.Error(w, "could not unmarshal pod", http.StatusBadRequest)
+        return
+    }
+
+    // Mutate pod with HTTPS_PROXY environment variable
+    patchBytes, err := json.Marshal(createPatch(pod))
     if err != nil {
-        http.Error(w, "Error reading request body", http.StatusBadRequest)
+        http.Error(w, "could not marshal patch", http.StatusInternalServerError)
         return
     }
+    admissionResponse := admissionv1.AdmissionResponse{
+        Allowed: true,
+        Patch:   patchBytes,
+        PatchType: func() *admissionv1.PatchType {
+            pt := admissionv1.PatchTypeJSONPatch
+            return &pt
+        }(),
+    }
 
-    var pod Pod
-    if err := json.Unmarshal(body, &pod); err != nil {
-        http.Error(w, "Error parsing request body", http.StatusBadRequest)
+    admissionReviewRes := admissionv1.AdmissionReview{
+        Response: &admissionResponse,
+    }
+    if err := json.NewEncoder(w).Encode(admissionReviewRes); err != nil {
+        http.Error(w, "could not encode response", http.StatusInternalServerError)
         return
     }
+}
 
-    for i, container := range pod.Spec.Containers {
-        envVar := make(map[string]Env)
-        envVar["HTTPS_PROXY"] = Env{"HTTPS_PROXY", "egress"}
-        pod.Spec.Containers[i].Env = append(container.Env, envVar)
+func createPatch(pod *corev1.Pod) []patchOperation {
+    patchOps := []patchOperation{}
+
+    // Add HTTPS_PROXY environment variable to container(s)
+    for i := range pod.Spec.Containers {
+        container := &pod.Spec.Containers[i]
+        envVar := corev1.EnvVar{
+            Name:  "HTTPS_PROXY",
+            Value: "egress",
+        }
+        container.Env = append(container.Env, envVar)
+
+        patchOps = append(patchOps, patchOperation{
+            Op:    "add",
+            Path:  "/spec/containers/" + string(i) + "/env/-",
+            Value: envVar,
+        })
     }
 
-    patchedPod, err := json.Marshal(pod)
-    if err != nil {
-        http.Error(w, "Error generating response body", http.StatusInternalServerError)
-        return
-    }
+    return patchOps
+}
 
-    w.Header().Set("Content-Type", "application/json")
-    w.WriteHeader(http.StatusOK)
-    w.Write(patchedPod)
+type patchOperation struct {
+    Op    string      `json:"op"`
+    Path  string      `json:"path"`
+    Value interface{} `json:"value"`
 }
