@@ -27,3 +27,4 @@ stage('Use Credential') {
         }
     }
 }
+gcloud logging read "logName=projects/PROJECT_ID/logs/compute.googleapis.com%2Ffirewall AND resource.type=gce_firewall_rule AND jsonPayload.rule_details LIKE 'firewall-rule-name'"
