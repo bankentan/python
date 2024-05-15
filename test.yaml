@@ -1,1 +1,1 @@
-modified_url = re.sub(r'/([a-zA-Z0-9]+)/', r'/job/\1/job/', url)
+modified_url = re.sub(r'(?<!/)/(?=[^/]|$)', '/job/', url)
