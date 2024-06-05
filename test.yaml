@@ -1,10 +1,52 @@
-def list = [111111, 222222]
-def str = '33333333;4444444444;555555555'
+在Jenkins中，如果你希望在一个Folder中的Pipeline使用另一个Folder中的Credentials，可以通过以下步骤来实现：
 
-// 将列表元素连接成一个字符串，使用分号分隔
-def joinedList = list.join(';')
+确保正确的权限配置：
+确保folderB中的Pipeline有权限访问folderA中的Credentials。这可能需要调整Jenkins的权限管理设置（如Role-based Strategy插件），以允许folderB的作业访问folderA的Credentials。
 
-// 将连接后的列表字符串添加到原始字符串中
-def result = str + ";" + joinedList
+在Pipeline脚本中使用Credentials:
+在Pipeline脚本中，你可以使用credentialsId来引用Credentials。假设aaa是folderA中的Credentials的ID，你可以在Pipeline脚本中这样使用：
+pipeline {
+    agent any
+    stages {
+        stage('Example') {
+            steps {
+                script {
+                    // 使用credentials的方式
+                    withCredentials([usernamePassword(credentialsId: 'folderA/aaa', usernameVariable: 'USERNAME', passwordVariable: 'PASSWORD')]) {
+                        echo "Username is ${env.USERNAME}"
+                        // 使用USERNAME和PASSWORD变量进行后续操作
+                    }
+                }
+            }
+        }
+    }
+}
 
-println result
+配置Global Credentials（可选）：
+如果无法直接访问其他Folder中的Credentials，另一种方法是将Credentials配置为Global（全局）级别。这样，所有Jobs和Pipelines都可以访问这些Credentials。在Jenkins管理界面中，导航到Manage Jenkins -> Manage Credentials，然后将Credentials添加到(global)域中。
+
+Folder的Credential ID命名空间:
+如果使用Folder级别的Credential，需要在ID前加上Folder的命名空间。举个例子，如果aaa是folderA中的Credentials，那么在folderB中的Pipeline需要这样引用：folderA::aaa。
+
+pipeline {
+    agent any
+    stages {
+        stage('Example') {
+            steps {
+                script {
+                    withCredentials([usernamePassword(credentialsId: 'folderA::aaa', usernameVariable: 'USERNAME', passwordVariable: 'PASSWORD')]) {
+                        echo "Username is ${env.USERNAME}"
+                        // 使用USERNAME和PASSWORD变量进行后续操作
+                    }
+                }
+            }
+        }
+    }
+}
+
+总结：
+
+确保权限配置正确，允许访问其他Folder中的Credentials。
+在Pipeline脚本中使用credentialsId，根据需要调整命名空间。
+如果必要，可以考虑将Credentials设置为全局。
+这样配置后，pipeline bbb就可以使用credential aaa了
