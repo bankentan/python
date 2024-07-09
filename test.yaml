@@ -1,34 +1,43 @@
-是的，当使用 Google Cloud Platform (GCP) 的 Database Migration Service (DMS) 连接 AlloyDB 时，确实需要确保 DMS 使用的服务账号（SA）具有适当的权限。
+pipeline {
+    agent any
 
-具体步骤如下：
+    stages {
+        stage('Stage 1') {
+            steps {
+                script {
+                    // 你的 stage1 的代码
+                    echo 'Stage 1 running...'
+                    // 设置一个环境变量用于标记 stage1 的成功状态
+                    env.STAGE1_SUCCESS = 'true'
+                }
+            }
+            post {
+                failure {
+                    script {
+                        // 如果 stage1 失败，设置 STAGE1_SUCCESS 为 false
+                        env.STAGE1_SUCCESS = 'false'
+                    }
+                }
+            }
+        }
 
-找到DMS的服务账号：
+        stage('Stage 2') {
+            steps {
+                // 你的 stage2 的代码
+                echo 'Stage 2 running...'
+            }
+        }
 
-DMS 服务账号通常为 service-[PROJECT_NUMBER]@gcp-sa-dms.iam.gserviceaccount.com，其中 [PROJECT_NUMBER] 是你的 GCP 项目的编号。
-授予AlloyDB连接权限：
-
-需要为这个服务账号授予访问 AlloyDB 实例的权限。
-你可以通过以下步骤为 DMS 服务账号添加必要的权限：
-
-通过GCP控制台设置权限：
-进入IAM页面：
-
-在 GCP 控制台中，导航到“IAM & Admin” -> “IAM”。
-找到并选择DMS服务账号：
-
-在 IAM 页面中，找到 DMS 的服务账号 service-[PROJECT_NUMBER]@gcp-sa-dms.iam.gserviceaccount.com。
-编辑权限：
-
-点击“编辑成员”，然后添加以下角色：
-roles/alloydb.client（AlloyDB Client 角色）
-通过gcloud命令行工具设置权限：
-使用以下命令为DMS服务账号添加AlloyDB Client角色：
-
-sh
-复制代码
-gcloud projects add-iam-policy-binding [YOUR_PROJECT_ID] \
-    --member "serviceAccount:service-[PROJECT_NUMBER]@gcp-sa-dms.iam.gserviceaccount.com" \
-    --role "roles/alloydb.client"
-其中 [YOUR_PROJECT_ID] 是你的项目ID，[PROJECT_NUMBER] 是你的项目编号。
-
-确保这些步骤执行完成后，DMS 的服务账号应具备连接和管理 AlloyDB 实例所需的权限。
+        stage('Stage 3') {
+            when {
+                expression {
+                    return env.STAGE1_SUCCESS == 'true'
+                }
+            }
+            steps {
+                // 你的 stage3 的代码
+                echo 'Stage 3 running...'
+            }
+        }
+    }
+}
