@@ -1,43 +1,11 @@
-pipeline {
-    agent any
-
-    stages {
-        stage('Stage 1') {
-            steps {
-                script {
-                    // 你的 stage1 的代码
-                    echo 'Stage 1 running...'
-                    // 设置一个环境变量用于标记 stage1 的成功状态
-                    env.STAGE1_SUCCESS = 'true'
-                }
-            }
-            post {
-                failure {
-                    script {
-                        // 如果 stage1 失败，设置 STAGE1_SUCCESS 为 false
-                        env.STAGE1_SUCCESS = 'false'
-                    }
-                }
-            }
-        }
-
-        stage('Stage 2') {
-            steps {
-                // 你的 stage2 的代码
-                echo 'Stage 2 running...'
-            }
-        }
-
-        stage('Stage 3') {
-            when {
-                expression {
-                    return env.STAGE1_SUCCESS == 'true'
-                }
-            }
-            steps {
-                // 你的 stage3 的代码
-                echo 'Stage 3 running...'
-            }
-        }
-    }
-}
+curl -X POST "http://your-jenkins-url/credentials/store/system/domain/_/createCredentials" \
+  --user "your-username:your-api-token" \
+  -H "Content-Type: application/xml" \
+  --data @- << EOF
+<com.cloudbees.plugins.credentials.impl.FileCredentialsImpl>
+    <scope>GLOBAL</scope>
+    <id>your-credential-id</id>
+    <description>Your new credential description</description>
+    <file>/path/to/your/new/secret-file</file>
+</com.cloudbees.plugins.credentials.impl.FileCredentialsImpl>
+EOF
