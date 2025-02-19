@@ -24,3 +24,30 @@ curl -X POST "http://your-jenkins-url/credentials/store/system/domain/_/createCr
 EOF
 
 curl -u your-username:your-api-token "http://your-jenkins-url/credentials/store/system/domain/_/api/json"
+
+
+pipeline {
+    agent any
+
+    stages {
+        stage('Update Credentials') {
+            steps {
+                script {
+                    // 通过 Groovy 脚本更新凭据
+                    def creds = new com.cloudbees.plugins.credentials.impl.FileCredentialsImpl(
+                        com.cloudbees.plugins.credentials.CredentialsScope.GLOBAL,
+                        'your-credential-id',
+                        'Updated credential description',
+                        new File('/path/to/your/new/secret-file')
+                    )
+
+                    def domain = com.cloudbees.plugins.credentials.domains.Domain.global()
+                    def store = jenkins.model.Jenkins.instance.getExtensionList('com.cloudbees.plugins.credentials.SystemCredentialsProvider')[0].getStore()
+                    store.addCredentials(domain, creds)
+
+                    echo "Credential updated successfully!"
+                }
+            }
+        }
+    }
+}
