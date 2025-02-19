@@ -9,3 +9,18 @@ curl -X POST "http://your-jenkins-url/credentials/store/system/domain/_/createCr
     <file>/path/to/your/new/secret-file</file>
 </com.cloudbees.plugins.credentials.impl.FileCredentialsImpl>
 EOF
+
+
+curl -X POST "http://your-jenkins-url/credentials/store/system/domain/_/createCredentials" \
+  --user "your-username:your-api-token" \
+  -H "Content-Type: application/xml" \
+  --data @- << EOF
+<com.cloudbees.plugins.credentials.impl.FileCredentialsImpl>
+    <scope>GLOBAL</scope>
+    <id>new-credential-id</id>
+    <description>Updated secret file credential</description>
+    <file>/path/to/your/new/secret-file</file>
+</com.cloudbees.plugins.credentials.impl.FileCredentialsImpl>
+EOF
+
+curl -u your-username:your-api-token "http://your-jenkins-url/credentials/store/system/domain/_/api/json"
