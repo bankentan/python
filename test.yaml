@@ -1,5 +1,58 @@
-resource.type="pubsub_subscription"
-resource.labels.subscription_id="your-dlq-subscription-id"
-protoPayload.methodName="google.pubsub.v1.Subscriber.Pull"
-jsonPayload.message.deliveryAttempt > 8
-jsonPayload.message.publishTime < "2023-02-01T00:00:00Z"
+你想要通过在 BigQuery (GCP) 上创建一个 视图（view），排除掉 tableB 中的 case_id 在 tableA 中的记录。为了实现这一点，可以使用 SQL 的 NOT IN 或 LEFT JOIN 方法来实现排除操作。
+
+以下是如何用 SQL 语句来实现这个需求的示例。
+
+假设：
+
+tableA 包含字段：case_id, case_detail, case_date
+
+tableB 包含字段：case_id
+
+1. 使用 NOT IN 来排除 tableB 中的 case_id
+CREATE VIEW your_project.your_dataset.filtered_cases AS
+SELECT
+  case_id,
+  case_detail,
+  case_date
+FROM
+  `your_project.your_dataset.tableA`
+WHERE
+  case_id NOT IN (SELECT case_id FROM `your_project.your_dataset.tableB`);
+解释：
+
+SELECT case_id FROM tableB 获取 tableB 中所有的 case_id。
+
+NOT IN 筛选出那些不在 tableB 中的 case_id，从而排除掉这些记录。
+
+最终，你创建了一个视图 filtered_cases，其中包含了 tableA 中所有 case_id 不在 tableB 中的记录。
+
+2. 使用 LEFT JOIN 来排除 tableB 中的 case_id
+
+另一种实现方式是使用 LEFT JOIN，然后过滤掉 tableB 中匹配的记录：
+
+CREATE VIEW your_project.your_dataset.filtered_cases AS
+SELECT
+  a.case_id,
+  a.case_detail,
+  a.case_date
+FROM
+  `your_project.your_dataset.tableA` a
+LEFT JOIN
+  `your_project.your_dataset.tableB` b
+ON
+  a.case_id = b.case_id
+WHERE
+  b.case_id IS NULL;
+解释：
+
+这里使用 LEFT JOIN 连接 tableA 和 tableB，连接条件是 a.case_id = b.case_id。
+
+通过 WHERE b.case_id IS NULL 来排除所有在 tableB 中存在的 case_id。只有在 tableB 中没有匹配的 case_id 时，这些记录才会出现在最终的视图中。
+
+小结：
+
+使用 NOT IN 是一种直观的方式，但是当 tableB 中有很多 case_id 时，性能可能会稍有影响，尤其是在 tableB 很大的情况下。
+
+使用 LEFT JOIN 通常更高效，尤其是在需要排除多个记录时，执行计划可能会更加优化。
+
+选择哪种方法取决于你的数据规模和查询性能需求
